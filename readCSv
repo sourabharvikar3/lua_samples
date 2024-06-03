@@ -25,3 +25,38 @@ local first_value, second_value = extract_first_two_values(csv_line)
 -- Print the extracted values
 print("First value:", first_value)
 print("Second value:", second_value)
+
+-- Function to extract the first two values from a CSV line
+oui_prefix = {}
+local function load_mac_prefix(line)
+  local function extract_first_two_values(csv_line)
+      local pattern = '"([^"]+)","([^"]+)"'
+      local first_value, second_value = csv_line:match(pattern)
+      return first_value, second_value
+  end
+  
+  -- Example CSV line
+  local csv_line = line
+  
+  -- Extract the first two values
+  local first_value, second_value = extract_first_two_values(csv_line)
+  
+  -- Print the extracted values
+  print("First value:", first_value)
+  print("Second value:", second_value)
+  
+  oui_prefix[first_value]= second_value
+  
+end
+
+
+local function get_vendor(mac)
+    local prefix = mac:sub(1, 8):upper() -- Extract the first 3 bytes (24 bits) as the OUI prefix
+    return oui_prefix[prefix] or "Unknown"
+end
+
+
+load_mac_prefix('"00.00.00","Vendor Inc.",Active')
+local result = get_vendor("00.00.00.11.12.45")
+print(result)
+
