@@ -1,0 +1,151 @@
+local stdnse = require "stdnse"
+local ipOps = require "ipOps"
+local nmap = require "nmap"
+local shortport = require "shortport"
+
+category = {"safe", "discover"}
+
+portrule = shortport.port_or_service(135)
+
+
+local function parse_ping_output(output)
+    local hosts = {}
+    for line in output:gmatch("[^\r\n]+") do
+        if line:match("^Nmap scan report for") then
+            local ip = line:match("for ([%d%.]+)")
+            table.insert(hosts, {ip = ip})
+        elseif line:match("^Host is up") then
+            local latency = line:match("%(([%d%.]+)s latency%)")
+            hosts[#hosts].latency = latency
+        elseif line:match("^MAC Address") then
+            local mac, vendor = line:match("MAC Address: ([%x:]+) %((.-)%)")
+            hosts[#hosts].mac = mac
+            hosts[#hosts].vendor = vendor
+        end
+    end
+    return hosts
+end
+
+-- returns ip, mac, vendor
+local function ping(target)
+    local cmd = "nmap -sn " .. target
+    local handle = io.popen(cmd)
+    local result = handle:read("*a")
+    handle:close()
+
+    -- parse the result
+    -- stdnse.print_debug("ping result - %s", result)
+
+    local parsed_result = parse_ping_output(result)
+
+    return parsed_result
+end
+
+-- Function to parse ARP table output
+local function parse_arp_output(output)
+    local arp_entries = {}
+    for line in output:gmatch("[^\r\n]+") do
+        -- Skip the header and interface line
+        if line:match("^%s*Internet Address") or line:match("^Interface:") then
+            goto continue
+        end
+
+        -- Extract IP address, MAC address, and type
+        local ip, mac, ttype = line:match("^%s*(%d+%.%d+%.%d+%.%d+)%s+(%x%x%-%x%x%-%x%x%-%x%x%-%x%x%-%x%x)%s+(%a+)")
+        if ip and mac and ttype == "dynamic" then
+            table.insert(arp_entries, {ip = ip, mac = mac, type = ttype})
+        end
+
+        ::continue::
+    end
+    return arp_entries
+end
+
+-- returns ip, mac, type
+local function read_arp_cache()
+    local cmd  = "arp -a"
+
+    -- Execute the command and capture the output
+    local pipe = io.popen(cmd)
+    local output = pipe:read("*all")
+    pipe:close()
+
+    return parse_arp_output(output)
+end
+
+-- merges of ping and arp cache
+-- returns ip, mac, vendor, protocol
+local function merge_ping_arp_results(ping_results, arp_results)
+    local merge_table = {} -- ip, mac, vendor, protocol
+
+    -- Add all elements from the ping table
+    -- ip , mac, vendor
+    for _, value in ipairs(ping_results) do
+        local ip1 = ""
+        local mac1 = ""
+        local vendor1 = "Unknown"
+        if value.ip then
+            ip1 = value.ip     
+        end
+        if value.mac then
+            mac1 = value.mac
+        end
+        if value.vendor then
+            vendor1 = value.vendor
+        end
+
+        table.insert(merge_table, {ip = ip1, mac = mac1, vendor = vendor1, protocol = "icmp"})
+    end
+
+    -- Add all elements from the arp table
+    -- ip, mac , type
+    for _, value in ipairs(arp_results) do
+        local ip1 = ""
+        local mac1 = ""
+        local vendor1 = ""
+        if value.ip then
+            ip1 = value.ip     
+        end
+        if value.mac then
+            mac1 = value.mac
+        end
+        table.insert(merge_table, {ip = ip1, mac = mac1, vendor = vendor1, protocol = "arp"})
+    end
+
+    return merge_table
+end
+
+action = function()
+
+    -- capture the input param
+    local subnet = nmap.registry.args.subnet or nil
+    stdnse.print_debug("input subnet - %s",subnet)
+
+    -- input param check
+    if subnet == nil then 
+        return false
+    end
+
+    -- let's do ping sweep and capture the result
+    local ping_results = ping(subnet)
+    local arp_results = read_arp_cache()
+
+    -- merge ping and arp results
+    local merged_ping_arp_results = merge_ping_arp_results(ping_results,arp_results)
+
+    -- stdnse.print_debug("final output: %s", merged_ping_arp_results)
+
+    -- print merged reult
+    print("---&&&&&---")
+    for _, host in ipairs(merged_ping_arp_results) do
+        print("IP: " .. host.ip)
+        print("MAC: " .. host.mac)
+        print("Vendor: " .. host.vendor)
+        print("Protocol: " .. host.protocol)
+        print("---")
+    end
+    print("---&&&&&---")
+
+
+    return stdnse.format_output(true, merged_ping_arp_results)
+end
