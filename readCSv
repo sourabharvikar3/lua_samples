@@ -1,0 +1,27 @@
+-- Function to extract the first two values from a CSV line
+local function extract_first_two_values(csv_line)
+    local pattern = '"([^"]+)","([^"]+)"'
+    local first_value, second_value = csv_line:match(pattern)
+    return first_value, second_value
+end
+
+local function parse_oui_database(oui_file)
+    local oui_lookup = {}
+    for line in io.lines(oui_file) do
+        local _, _, prefix, vendor = line:find("^([0-9A-Fa-f]+)%s+(.*)$")
+        if prefix and vendor then
+            oui_lookup[prefix] = vendor
+        end
+    end
+    return oui_lookup
+end
+
+-- Example CSV line
+local csv_line = '"00.00.00","Vendor Inc.",Active'
+
+-- Extract the first two values
+local first_value, second_value = extract_first_two_values(csv_line)
+
+-- Print the extracted values
+print("First value:", first_value)
+print("Second value:", second_value)
