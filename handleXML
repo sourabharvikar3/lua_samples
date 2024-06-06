@@ -1,0 +1,41 @@
+local function escapeXml(value)
+    value = value:gsub("&", "&amp;")
+    value = value:gsub("<", "&lt;")
+    value = value:gsub(">", "&gt;")
+    value = value:gsub("'", "&apos;")
+    value = value:gsub("\"", "&quot;")
+    return value
+end
+
+local function writeElement(buffer, name, attributes, content)
+    table.insert(buffer, "<" .. name)
+    if attributes then
+        for k, v in pairs(attributes) do
+            table.insert(buffer, string.format(" %s='%s'", k, escapeXml(v)))
+        end
+    end
+    if content then
+        table.insert(buffer, ">" .. escapeXml(content) .. "</" .. name .. ">\n")
+    else
+        table.insert(buffer, "/>\n")
+    end
+end
+
+local function createXmlBuffer()
+    local buffer = {}
+    --table.insert(buffer, '<?xml version="1.0" encoding="UTF-8"?>\n')
+    table.insert(buffer, "<root>\n")
+
+    writeElement(buffer, "child", {attr1 = "value1", attr2 = "value2", attr5 = "sourabh"})
+    writeElement(buffer, "child", {attr1 = "value3", attr2 = "value4"})
+
+    table.insert(buffer, "</root>\n")
+
+    return table.concat(buffer)
+end
+
+-- Create the XML buffer
+local xmlBuffer = createXmlBuffer()
+
+-- Print the XML buffer to console
+print(xmlBuffer)
