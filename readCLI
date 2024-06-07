@@ -1,0 +1,3 @@
+local netbios_name = data:match("NetBIOS name: (%w+)")
+local netbios_user = data:match("NetBIOS user: (%g+)")
+local netbios_mac = data:match("NetBIOS MAC: ([%x:]+)")
