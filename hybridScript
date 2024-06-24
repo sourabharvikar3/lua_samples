@@ -1,0 +1,54 @@
+-- Define the Lua module
+mymodule = {}
+
+-- Function to check if a specific port is open
+function mymodule.is_port_open(host, port_number)
+  local ports = host.ports
+  for _, port in ipairs(ports) do
+    if port.number == port_number and port.state == "open" then
+      return true
+    end
+  end
+  return false
+end
+
+-- Return the module table
+_G['mymodule'] = mymodule
+
+-- Define the script properties
+description = [[
+This script reads the current target information, uses the mymodule to check if specific ports are open, and processes the information.
+]]
+
+-- Import necessary libraries
+local stdnse = require "stdnse"
+
+-- Define the action function
+action = function(host)
+  -- Read target information
+  local ip = host.ip
+  
+  -- Check if specific ports are open using mymodule
+  local port_80_open = mymodule.is_port_open(host, 80)
+  local port_443_open = mymodule.is_port_open(host, 443)
+  
+  -- Print target information
+  stdnse.print_debug(1, "Current Target IP: %s", ip)
+  stdnse.print_debug(1, "Port 80 open: %s", tostring(port_80_open))
+  stdnse.print_debug(1, "Port 443 open: %s", tostring(port_443_open))
+  
+  -- Process target information
+  local result = ""
+  if port_80_open then
+    result = result .. "Port 80 is open. "
+  end
+  if port_443_open then
+    result = result .. "Port 443 is open. "
+  end
+  if result == "" then
+    result = "No specified ports are open."
+  end
+
+  -- Return script results
+  return stdnse.format_output(true, result)
+end
